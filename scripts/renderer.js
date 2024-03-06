@@ -45,7 +45,11 @@ class Renderer {
                         CG.Vector3(30, 30, 1),
                         CG.Vector3(-30, 30, 1)
                     ],
-                    transform: new Matrix(3, 3)
+                    transform: new Matrix(3, 3),
+                    angVelocity: 3,
+                    theta: 0,
+                    x: 150,
+                    y: 150
                 },
                 {
                     vertices: [
@@ -54,7 +58,11 @@ class Renderer {
                         CG.Vector3(20, 20, 1),
                         CG.Vector3(-20, 20, 1)
                     ],
-                    transform: new Matrix(3, 3)
+                    transform: new Matrix(3, 3),
+                    angVelocity: 1,
+                    theta: 0,
+                    x: 400,
+                    y: 350
                 },
                 {
                     vertices: [
@@ -63,7 +71,11 @@ class Renderer {
                         CG.Vector3(40, 15, 1),
                         CG.Vector3(-40, 15, 1)
                     ],
-                    transform: new Matrix(3, 3)
+                    transform: new Matrix(3, 3),
+                    angVelocity: -10,
+                    theta: 0,
+                    x: 650,
+                    y: 500
                 }
             ],
 
@@ -91,10 +103,6 @@ class Renderer {
         };
 
         CG.mat3x3Translate(this.models.slide0[0].transform, this.canvas.width / 2, this.canvas.height / 2);
-
-        CG.mat3x3Translate(this.models.slide1[0].transform, 150, 150);
-        CG.mat3x3Translate(this.models.slide1[1].transform, 400, 350);
-        CG.mat3x3Translate(this.models.slide1[2].transform, 650, 500);
 
         CG.mat3x3Translate(this.models.slide2[0].transform, 200, 250);
         CG.mat3x3Translate(this.models.slide2[1].transform, 550, 400);
@@ -173,6 +181,17 @@ class Renderer {
             }
 
             CG.mat3x3Translate(ball.transform, Math.max(0, Math.min(this.canvas.width, new_x)), Math.max(0, Math.min(this.canvas.height, new_y)));
+        } else if (this.slide_idx === 1) {
+            // Spinning polygons
+            for (const polygon of this.models.slide1) {
+                const delta_theta = polygon.angVelocity * delta_time;
+                polygon.theta += delta_theta;
+                const rotation = new Matrix(3, 3);
+                CG.mat3x3Rotate(rotation, polygon.theta);
+                const translation = new Matrix(3, 3);
+                CG.mat3x3Translate(translation, polygon.x, polygon.y);
+                polygon.transform = Matrix.multiply([translation, rotation]);
+            }
         }
     }
 
