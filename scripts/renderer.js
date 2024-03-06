@@ -1,8 +1,9 @@
 import * as CG from './transforms.js';
+import { Matrix } from './matrix.js';
 
 class Renderer {
     // canvas:              object ({id: __, width: __, height: __})
-    // limit_fps_flag:      bool 
+    // limit_fps_flag:      bool
     // fps:                 int
     constructor(canvas, limit_fps_flag, fps) {
         this.canvas = document.getElementById(canvas.id);
@@ -15,23 +16,88 @@ class Renderer {
         this.start_time = null;
         this.prev_time = null;
 
+        const numSides = 20;
+        const radius = 20;
+        const ballVertices = [];
+
+        for (let i = 0; i < numSides; i++) {
+            const angle = (2 * Math.PI * i) / numSides;
+            const x = radius * Math.cos(angle);
+            const y = radius * Math.sin(angle);
+            ballVertices.push(CG.Vector3(x, y, 1));
+        }
+
         this.models = {
+
             slide0: [
-                // example model (diamond) -> should be replaced with actual model
                 {
-                    vertices: [
-                        CG.Vector3(400, 150, 1),
-                        CG.Vector3(500, 300, 1),
-                        CG.Vector3(400, 450, 1),
-                        CG.Vector3(300, 300, 1)
-                    ],
-                    transform: null
+                    vertices: ballVertices,
+                    transform: new Matrix(3, 3),
+                    velocity: { x: 5.75, y: 5.5 }
                 }
             ],
-            slide1: [],
-            slide2: [],
+
+            slide1: [
+                {
+                    vertices: [
+                        CG.Vector3(-30, -30, 1),
+                        CG.Vector3(30, -30, 1),
+                        CG.Vector3(30, 30, 1),
+                        CG.Vector3(-30, 30, 1)
+                    ],
+                    transform: new Matrix(3, 3)
+                },
+                {
+                    vertices: [
+                        CG.Vector3(-20, -20, 1),
+                        CG.Vector3(20, -20, 1),
+                        CG.Vector3(20, 20, 1),
+                        CG.Vector3(-20, 20, 1)
+                    ],
+                    transform: new Matrix(3, 3)
+                },
+                {
+                    vertices: [
+                        CG.Vector3(-40, -15, 1),
+                        CG.Vector3(40, -15, 1),
+                        CG.Vector3(40, 15, 1),
+                        CG.Vector3(-40, 15, 1)
+                    ],
+                    transform: new Matrix(3, 3)
+                }
+            ],
+
+            slide2: [
+                {
+                    vertices: [
+                        CG.Vector3(-30, -30, 1),
+                        CG.Vector3(30, -30, 1),
+                        CG.Vector3(30, 30, 1),
+                        CG.Vector3(-30, 30, 1)
+                    ],
+                    transform: new Matrix(3, 3)
+                },
+                {
+                    vertices: [
+                        CG.Vector3(-20, -20, 1),
+                        CG.Vector3(20, -20, 1),
+                        CG.Vector3(20, 20, 1),
+                        CG.Vector3(-20, 20, 1)
+                    ],
+                    transform: new Matrix(3, 3)
+                }
+            ],
             slide3: []
         };
+
+        CG.mat3x3Translate(this.models.slide0[0].transform, this.canvas.width / 2, this.canvas.height / 2);
+
+        CG.mat3x3Translate(this.models.slide1[0].transform, 150, 150);
+        CG.mat3x3Translate(this.models.slide1[1].transform, 400, 350);
+        CG.mat3x3Translate(this.models.slide1[2].transform, 650, 500);
+
+        CG.mat3x3Translate(this.models.slide2[0].transform, 200, 250);
+        CG.mat3x3Translate(this.models.slide2[1].transform, 550, 400);
     }
 
     // flag:  bool
@@ -86,8 +152,31 @@ class Renderer {
     //
     updateTransforms(time, delta_time) {
         // TODO: update any transformations needed for animation
+
+        delta_time = delta_time / (1000.0 / 60);
+
+        if (this.slide_idx === 0) {
+
+            const ball = this.models.slide0[0];
+            const velocity = ball.velocity;
+
+            const new_x = ball.transform.values[0][2] + velocity.x * delta_time;
+            const new_y = ball.transform.values[1][2] + velocity.y * delta_time;
+
+            CG.mat3x3Translate(ball.transform, new_x, new_y);
+
+            if (new_x <= 0 || new_x >= this.canvas.width) {
+                velocity.x = -velocity.x;
+            }
+            if (new_y <= 0 || new_y >= this.canvas.height) {
+                velocity.y = -velocity.y;
+            }
+
+            CG.mat3x3Translate(ball.transform, Math.max(0, Math.min(this.canvas.width, new_x)), Math.max(0, Math.min(this.canvas.height, new_y)));
+        }
     }
-    
+
+
     //
     drawSlide() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -111,20 +200,36 @@ class Renderer {
     //
     drawSlide0() {
         // TODO: draw bouncing ball (circle that changes direction whenever it hits an edge)
-        
-        
-        // Following lines are example of drawing a single polygon
-        // (this should be removed/edited after you implement the slide)
-        let teal = [0, 128, 128, 255];
-        this.drawConvexPolygon(this.models.slide0[0].vertices, teal);
+
+        const ball = this.models.slide0[0];
+        const transformedVertices = [];
+
+        for (let i = 0; i < ball.vertices.length; i++) {
+            const vertex = ball.vertices[i];
+            const transformedVertex = Matrix.multiply([ball.transform, vertex]);
+            transformedVertices.push(transformedVertex);
+        }
+
+        this.drawConvexPolygon(transformedVertices, [255, 0, 0, 255]);
     }
 
     //
     drawSlide1() {
         // TODO: draw at least 3 polygons that spin about their own centers
         //   - have each polygon spin at a different speed / direction
-        
-        
+
+        for (let i = 0; i < this.models.slide1.length; i++) {
+            const polygon = this.models.slide1[i];
+            const transformedVertices = [];
+
+            for (let j = 0; j < polygon.vertices.length; j++) {
+                const vertex = polygon.vertices[j];
+                const transformedVertex = Matrix.multiply([polygon.transform, vertex]);
+                transformedVertices.push(transformedVertex);
+            }
+
+            this.drawConvexPolygon(transformedVertices, [255, 0, 0, 255]);
+        }
     }
 
     //
@@ -133,18 +238,30 @@ class Renderer {
         //   - have each polygon grow / shrink different sizes
         //   - try at least 1 polygon that grows / shrinks non-uniformly in the x and y directions
 
+        for (let i = 0; i < this.models.slide2.length; i++) {
+            const polygon = this.models.slide2[i];
+            const transformedVertices = [];
 
+            for (let j = 0; j < polygon.vertices.length; j++) {
+                const vertex = polygon.vertices[j];
+                const transformedVertex = Matrix.multiply([polygon.transform, vertex]);
+                transformedVertices.push(transformedVertex);
+            }
+
+            this.drawConvexPolygon(transformedVertices, [0, 255, 0, 255]);
+        }
     }
+
 
     //
     drawSlide3() {
         // TODO: get creative!
         //   - animation should involve all three basic transformation types
         //     (translation, scaling, and rotation)
-        
-        
+
+
     }
-    
+
     // vertex_list:  array of object [Matrix(3, 1), Matrix(3, 1), ..., Matrix(3, 1)]
     // color:        array of int [R, G, B, A]
     drawConvexPolygon(vertex_list, color) {
