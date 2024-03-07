@@ -87,25 +87,32 @@ class Renderer {
                         CG.Vector3(30, 30, 1),
                         CG.Vector3(-30, 30, 1)
                     ],
-                    transform: new Matrix(3, 3)
+                    transform: new Matrix(3, 3),
+                    scaleVelocity: { x: 0.05, y: 0.05 },
+                    scaleMagnitude: { x: 4, y: 4 },
+                    scale: { x: 1, y: 1 },
+                    x: 200,
+                    y: 250
                 },
                 {
                     vertices: [
-                        CG.Vector3(-20, -20, 1),
-                        CG.Vector3(20, -20, 1),
-                        CG.Vector3(20, 20, 1),
-                        CG.Vector3(-20, 20, 1)
+                        CG.Vector3(-20, -40, 1),
+                        CG.Vector3(20, -40, 1),
+                        CG.Vector3(20, 40, 1),
+                        CG.Vector3(-20, 40, 1)
                     ],
-                    transform: new Matrix(3, 3)
+                    transform: new Matrix(3, 3),
+                    scaleVelocity: { x: 0.05, y: -0.00625 },
+                    scaleMagnitude: { x: 5, y: 0.5 },
+                    scale: { x: 1, y: 1 },
+                    x: 550,
+                    y: 400
                 }
             ],
             slide3: []
         };
 
         CG.mat3x3Translate(this.models.slide0[0].transform, this.canvas.width / 2, this.canvas.height / 2);
-
-        CG.mat3x3Translate(this.models.slide2[0].transform, 200, 250);
-        CG.mat3x3Translate(this.models.slide2[1].transform, 550, 400);
     }
 
     // flag:  bool
@@ -191,6 +198,37 @@ class Renderer {
                 const translation = new Matrix(3, 3);
                 CG.mat3x3Translate(translation, polygon.x, polygon.y);
                 polygon.transform = Matrix.multiply([translation, rotation]);
+            }
+        } else if (this.slide_idx === 2) {
+            // Growing/shrinking polygons
+            for (const polygon of this.models.slide2) {
+                for (const dim in polygon.scale) {
+                    const delta_scale = polygon.scaleVelocity[dim] * delta_time;
+                    polygon.scale[dim] += delta_scale;
+
+                    // Resolve any scaling done past the magnitude bounds
+                    const maxSize = Math.max(1, polygon.scaleMagnitude[dim]);
+                    const minSize = Math.min(1, polygon.scaleMagnitude[dim]);
+                    while (polygon.scale[dim] > maxSize || polygon.scale[dim] < minSize) {
+                        if (polygon.scale[dim] > maxSize) {
+                            // Reverse velocity direction
+                            polygon.scaleVelocity[dim] *= -1;
+                            // Apply the offset from the bound in the opposite direction
+                            polygon.scale[dim] -= 2 * (polygon.scale[dim] - maxSize);
+                        }
+                        if (polygon.scale[dim] < minSize) {
+                            // Reverse velocity direction
+                            polygon.scaleVelocity[dim] *= -1;
+                            // Apply the offset from the bound in the opposite direction
+                            polygon.scale[dim] += 2 * (minSize - polygon.scale[dim]);
+                        }
+                    }
+                }
+                const scaling = new Matrix(3, 3);
+                CG.mat3x3Scale(scaling, polygon.scale.x, polygon.scale.y);
+                const translation = new Matrix(3, 3);
+                CG.mat3x3Translate(translation, polygon.x, polygon.y);
+                polygon.transform = Matrix.multiply([translation, scaling]);
             }
         }
     }
