@@ -33,7 +33,9 @@ class Renderer {
                 {
                     vertices: ballVertices,
                     transform: new Matrix(3, 3),
-                    velocity: { x: 5.75, y: 5.5 }
+                    velocity: { x: 5.75, y: 5.5 },
+                    x: this.canvas.width / 2,
+                    y: this.canvas.height / 2
                 }
             ],
 
@@ -109,10 +111,28 @@ class Renderer {
                     y: 400
                 }
             ],
-            slide3: []
-        };
 
-        CG.mat3x3Translate(this.models.slide0[0].transform, this.canvas.width / 2, this.canvas.height / 2);
+            slide3: [
+                {
+                    vertices: [
+                        CG.Vector3(-30, -30, 1),
+                        CG.Vector3(30, -30, 1),
+                        CG.Vector3(30, 30, 1),
+                        CG.Vector3(-30, 30, 1)
+                    ],
+                    transform: new Matrix(3, 3),
+                    angVelocity: 3,
+                    theta: 0,
+                    scaleVelocity: { x: 0.05, y: 0.05 },
+                    scaleMagnitude: { x: 4, y: 4 },
+                    scale: { x: 1, y: 1 },
+                    radius: 100,
+                    orbitSpeed: 0.001,
+                    x: 150,
+                    y: 150
+                }
+            ]
+        };
     }
 
     // flag:  bool
@@ -171,23 +191,23 @@ class Renderer {
         delta_time = delta_time / (1000.0 / 60);
 
         if (this.slide_idx === 0) {
-
             const ball = this.models.slide0[0];
             const velocity = ball.velocity;
 
-            const new_x = ball.transform.values[0][2] + velocity.x * delta_time;
-            const new_y = ball.transform.values[1][2] + velocity.y * delta_time;
+            ball.x += velocity.x * delta_time;
+            ball.y += velocity.y * delta_time;
 
-            CG.mat3x3Translate(ball.transform, new_x, new_y);
-
-            if (new_x <= 0 || new_x >= this.canvas.width) {
+            if (ball.x <= 0 || ball.x >= this.canvas.width) {
                 velocity.x = -velocity.x;
             }
-            if (new_y <= 0 || new_y >= this.canvas.height) {
+            if (ball.y <= 0 || ball.y >= this.canvas.height) {
                 velocity.y = -velocity.y;
             }
 
-            CG.mat3x3Translate(ball.transform, Math.max(0, Math.min(this.canvas.width, new_x)), Math.max(0, Math.min(this.canvas.height, new_y)));
+            ball.x = Math.max(0, Math.min(this.canvas.width, ball.x));
+            ball.y = Math.max(0, Math.min(this.canvas.height, ball.y));
+
+            CG.mat3x3Translate(ball.transform, ball.x, ball.y);
         } else if (this.slide_idx === 1) {
             // Spinning polygons
             for (const polygon of this.models.slide1) {
@@ -230,9 +250,40 @@ class Renderer {
                 CG.mat3x3Translate(translation, polygon.x, polygon.y);
                 polygon.transform = Matrix.multiply([translation, scaling]);
             }
+        } else if (this.slide_idx === 3) {
+            const polygon = this.models.slide3[0];
+            const delta_theta = polygon.angVelocity * delta_time;
+            polygon.theta += delta_theta;
+            const rotation = new Matrix(3, 3);
+            CG.mat3x3Rotate(rotation, polygon.theta);
+
+            polygon.x = this.canvas.width / 2 + polygon.radius * Math.cos(time * polygon.orbitSpeed);
+            polygon.y = this.canvas.height / 2 + polygon.radius * Math.sin(time * polygon.orbitSpeed);
+            const translation = new Matrix(3, 3);
+            CG.mat3x3Translate(translation, polygon.x, polygon.y);
+
+            for (const dim in polygon.scale) {
+                const delta_scale = polygon.scaleVelocity[dim] * delta_time;
+                polygon.scale[dim] += delta_scale;
+
+                const maxSize = Math.max(1, polygon.scaleMagnitude[dim]);
+                const minSize = Math.min(1, polygon.scaleMagnitude[dim]);
+                while (polygon.scale[dim] > maxSize || polygon.scale[dim] < minSize) {
+                    if (polygon.scale[dim] > maxSize) {
+                        polygon.scaleVelocity[dim] *= -1;
+                        polygon.scale[dim] -= 2 * (polygon.scale[dim] - maxSize);
+                    }
+                    if (polygon.scale[dim] < minSize) {
+                        polygon.scaleVelocity[dim] *= -1;
+                        polygon.scale[dim] += 2 * (minSize - polygon.scale[dim]);
+                    }
+                }
+            }
+            const scaling = new Matrix(3, 3);
+            CG.mat3x3Scale(scaling, polygon.scale.x, polygon.scale.y);
+            polygon.transform = Matrix.multiply([translation, scaling, rotation]);
         }
     }
-
 
     //
     drawSlide() {
@@ -254,7 +305,7 @@ class Renderer {
         }
     }
 
-    //
+    // Draw a bouncing ball
     drawSlide0() {
         // TODO: draw bouncing ball (circle that changes direction whenever it hits an edge)
 
@@ -270,7 +321,7 @@ class Renderer {
         this.drawConvexPolygon(transformedVertices, [255, 0, 0, 255]);
     }
 
-    //
+    // Draw spinning polygons
     drawSlide1() {
         // TODO: draw at least 3 polygons that spin about their own centers
         //   - have each polygon spin at a different speed / direction
@@ -285,11 +336,11 @@ class Renderer {
                 transformedVertices.push(transformedVertex);
             }
 
-            this.drawConvexPolygon(transformedVertices, [255, 0, 0, 255]);
+            this.drawConvexPolygon(transformedVertices, [0, 255, 0, 255]);
         }
     }
 
-    //
+    // Draw growing/shrinking polygons
     drawSlide2() {
         // TODO: draw at least 2 polygons grow and shrink about their own centers
         //   - have each polygon grow / shrink different sizes
@@ -305,18 +356,26 @@ class Renderer {
                 transformedVertices.push(transformedVertex);
             }
 
-            this.drawConvexPolygon(transformedVertices, [0, 255, 0, 255]);
+            this.drawConvexPolygon(transformedVertices, [0, 0, 255, 255]);
         }
     }
 
-
-    //
+    // Draw a spinning, growing/shrinking, and orbiting polygon
     drawSlide3() {
         // TODO: get creative!
         //   - animation should involve all three basic transformation types
         //     (translation, scaling, and rotation)
 
+        const polygon = this.models.slide3[0];
+        const transformedVertices = [];
 
+        for (let j = 0; j < polygon.vertices.length; j++) {
+            const vertex = polygon.vertices[j];
+            const transformedVertex = Matrix.multiply([polygon.transform, vertex]);
+            transformedVertices.push(transformedVertex);
+        }
+
+        this.drawConvexPolygon(transformedVertices, [0, 0, 0, 255]);
     }
 
     // vertex_list:  array of object [Matrix(3, 1), Matrix(3, 1), ..., Matrix(3, 1)]
