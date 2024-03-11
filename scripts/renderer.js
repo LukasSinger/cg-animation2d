@@ -100,6 +100,16 @@ class Renderer {
             slide3: [
                 {
                     vertices: [
+                        CG.Vector3(0, 0, 1),
+                        CG.Vector3(this.canvas.width, 0, 1),
+                        CG.Vector3(this.canvas.width, this.canvas.height, 1),
+                        CG.Vector3(0, this.canvas.height, 1)
+                    ],
+                    transform: new Matrix(3, 3),
+                    color: [0, 0, 0, 255]
+                },
+                {
+                    vertices: [
                         CG.Vector3(-30, -30, 1),
                         CG.Vector3(30, -30, 1),
                         CG.Vector3(30, 30, 1),
@@ -108,12 +118,29 @@ class Renderer {
                     transform: new Matrix(3, 3),
                     angVelocity: 3,
                     theta: 0,
-                    scaleVelocity: { x: 0.05, y: 0.05 },
-                    scaleMagnitude: { x: 4, y: 4 },
+                    scaleVelocity: { x: 0.025, y: 0.025 },
+                    scaleMagnitude: { x: 2.5, y: 2.5 },
                     scale: { x: 1, y: 1 },
-                    radius: 100,
+                    radius: 62.5,
+                    orbitCenter: { x: this.canvas.width / 2, y: this.canvas.height / 2 },
                     orbitSpeed: 0.001,
-                    position: { x: 150, y: 150 }
+                    position: { x: null, y: null }, // calculated every frame
+                    color: [0, 60, 200, 255]
+                },
+                {
+                    vertices: [
+                        CG.Vector3(-30, -25.981, 1),
+                        CG.Vector3(30, -25.981, 1),
+                        CG.Vector3(0, 25.981, 1),
+                    ],
+                    transform: new Matrix(3, 3),
+                    angVelocity: -5,
+                    theta: 0,
+                    radius: 125,
+                    orbitCenter: { x: null, y: null }, // calculated every frame
+                    orbitSpeed: 0.003,
+                    position: { x: null, y: null }, // calculated every frame
+                    color: [230, 230, 235, 255]
                 }
             ]
         };
@@ -274,37 +301,61 @@ class Renderer {
                 polygon.transform = Matrix.multiply([translation, scaling]);
             }
         } else if (this.slide_idx === 3) {
-            const polygon = this.models.slide3[0];
-            const delta_theta = polygon.angVelocity * delta_time;
-            polygon.theta += delta_theta;
-            const rotation = new Matrix(3, 3);
-            CG.mat3x3Rotate(rotation, polygon.theta);
+            // Spinning, growing/shrinking, and orbiting polygons
+            for (const polygon of this.models.slide3) {
+                // Ignore the background
+                if (polygon == this.models.slide3[0]) continue;
+                if (polygon == this.models.slide3[2]) {
+                    // Set orbit center to the square's current position
+                    polygon.orbitCenter.x = this.models.slide3[1].position.x;
+                    polygon.orbitCenter.y = this.models.slide3[1].position.y;
+                }
+                const delta_theta = polygon.angVelocity * delta_time;
+                polygon.theta += delta_theta;
+                const rotation = new Matrix(3, 3);
+                CG.mat3x3Rotate(rotation, polygon.theta);
 
-            polygon.position.x = this.canvas.width / 2 + polygon.radius * Math.cos(time * polygon.orbitSpeed);
-            polygon.position.y = this.canvas.height / 2 + polygon.radius * Math.sin(time * polygon.orbitSpeed);
-            const translation = new Matrix(3, 3);
-            CG.mat3x3Translate(translation, polygon.position.x, polygon.position.y);
+                polygon.position.x = polygon.orbitCenter.x; 
+                polygon.position.y = polygon.orbitCenter.y;
+                if (polygon == this.models.slide3[2]) {
+                    // Give moon extra radius based on scaling of square
+                    const square = this.models.slide3[1];
+                    polygon.position.x += polygon.radius * square.scale.x * Math.cos(time * polygon.orbitSpeed);
+                    polygon.position.y += polygon.radius * square.scale.y * Math.sin(time * polygon.orbitSpeed);
+                } else {
+                    polygon.position.x += polygon.radius * Math.cos(time * polygon.orbitSpeed);
+                    polygon.position.y += polygon.radius * Math.sin(time * polygon.orbitSpeed);
+                }
+                const translation = new Matrix(3, 3);
+                CG.mat3x3Translate(translation, polygon.position.x, polygon.position.y);
 
-            for (const dim in polygon.scale) {
-                const delta_scale = polygon.scaleVelocity[dim] * delta_time;
-                polygon.scale[dim] += delta_scale;
+                if (polygon == this.models.slide3[2]) {
+                    // The moon triangle should inherit the square's scaling
+                    polygon.scale = this.models.slide3[1].scale;
+                } else {
+                    for (const dim in polygon.scale) {
+                        const delta_scale = polygon.scaleVelocity[dim] * delta_time;
+                        polygon.scale[dim] += delta_scale;
 
-                const maxSize = Math.max(1, polygon.scaleMagnitude[dim]);
-                const minSize = Math.min(1, polygon.scaleMagnitude[dim]);
-                while (polygon.scale[dim] > maxSize || polygon.scale[dim] < minSize) {
-                    if (polygon.scale[dim] > maxSize) {
-                        polygon.scaleVelocity[dim] *= -1;
-                        polygon.scale[dim] -= 2 * (polygon.scale[dim] - maxSize);
-                    }
-                    if (polygon.scale[dim] < minSize) {
-                        polygon.scaleVelocity[dim] *= -1;
-                        polygon.scale[dim] += 2 * (minSize - polygon.scale[dim]);
+                        const maxSize = Math.max(1, polygon.scaleMagnitude[dim]);
+                        const minSize = Math.min(1, polygon.scaleMagnitude[dim]);
+                        while (polygon.scale[dim] > maxSize || polygon.scale[dim] < minSize) {
+                            if (polygon.scale[dim] > maxSize) {
+                                polygon.scaleVelocity[dim] *= -1;
+                                polygon.scale[dim] -= 2 * (polygon.scale[dim] - maxSize);
+                            }
+                            if (polygon.scale[dim] < minSize) {
+                                polygon.scaleVelocity[dim] *= -1;
+                                polygon.scale[dim] += 2 * (minSize - polygon.scale[dim]);
+                            }
+                        }
                     }
                 }
+                const scaling = new Matrix(3, 3);
+                CG.mat3x3Scale(scaling, polygon.scale.x, polygon.scale.y);
+
+                polygon.transform = Matrix.multiply([translation, scaling, rotation]);
             }
-            const scaling = new Matrix(3, 3);
-            CG.mat3x3Scale(scaling, polygon.scale.x, polygon.scale.y);
-            polygon.transform = Matrix.multiply([translation, scaling, rotation]);
         }
     }
 
@@ -383,22 +434,24 @@ class Renderer {
         }
     }
 
-    // Draw a spinning, growing/shrinking, and orbiting polygon
+    // Draw spinning, growing/shrinking, and orbiting polygons
     drawSlide3() {
         // TODO: get creative!
         //   - animation should involve all three basic transformation types
         //     (translation, scaling, and rotation)
 
-        const polygon = this.models.slide3[0];
-        const transformedVertices = [];
+        for (let i = 0; i < this.models.slide3.length; i++) {
+            const polygon = this.models.slide3[i];
+            const transformedVertices = [];
 
-        for (let j = 0; j < polygon.vertices.length; j++) {
-            const vertex = polygon.vertices[j];
-            const transformedVertex = Matrix.multiply([polygon.transform, vertex]);
-            transformedVertices.push(transformedVertex);
+            for (let j = 0; j < polygon.vertices.length; j++) {
+                const vertex = polygon.vertices[j];
+                const transformedVertex = Matrix.multiply([polygon.transform, vertex]);
+                transformedVertices.push(transformedVertex);
+            }
+
+            this.drawConvexPolygon(transformedVertices, polygon.color);
         }
-
-        this.drawConvexPolygon(transformedVertices, [0, 0, 0, 255]);
     }
 
     // vertex_list:  array of object [Matrix(3, 1), Matrix(3, 1), ..., Matrix(3, 1)]
