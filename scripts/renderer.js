@@ -184,23 +184,53 @@ class Renderer {
         delta_time = delta_time / (1000.0 / 60);
 
         if (this.slide_idx === 0) {
+            // Bouncing ball
             const ball = this.models.slide0[0];
             const velocity = ball.velocity;
 
             ball.position.x += velocity.x * delta_time;
             ball.position.y += velocity.y * delta_time;
 
-            if (ball.position.x <= 0 || ball.position.x >= this.canvas.width) {
-                velocity.x = -velocity.x;
+            // Resolve any movement done past the magnitude bounds
+            const min = { x: 0, y: 0 };
+            const max = { x: this.canvas.width, y: this.canvas.height };
+            let ballMinEdge = {};
+            let ballMaxEdge = {};
+            while (isOutOfBounds()) {
+                for (const dim in ball.position) {
+                    calcEdges(dim);
+                    if (ballMaxEdge[dim] > max[dim]) {
+                        // Reverse velocity direction
+                        ball.velocity[dim] *= -1;
+                        // Apply the offset from the bound in the opposite direction
+                        ball.position[dim] -= 2 * (ballMaxEdge[dim] - max[dim]);
+                    }
+                    calcEdges(dim);
+                    if (ballMinEdge[dim] < min[dim]) {
+                        // Reverse velocity direction
+                        ball.velocity[dim] *= -1;
+                        // Apply the offset from the bound in the opposite direction
+                        ball.position[dim] += 2 * (min[dim] - ballMinEdge[dim]);
+                    }
+                }
             }
-            if (ball.position.y <= 0 || ball.position.y >= this.canvas.height) {
-                velocity.y = -velocity.y;
-            }
-
-            ball.x = Math.max(0, Math.min(this.canvas.width, ball.x));
-            ball.y = Math.max(0, Math.min(this.canvas.height, ball.y));
 
             CG.mat3x3Translate(ball.transform, ball.position.x, ball.position.y);
+
+            function calcEdges(dim) {
+                ballMinEdge[dim] = ball.position[dim] - ball.radius;
+                ballMaxEdge[dim] = ball.position[dim] + ball.radius;
+            }
+
+            function isOutOfBounds() {
+                for (const dim in ball.position) {
+                    calcEdges(dim);
+                    if (ballMinEdge[dim] < min[dim] || ballMaxEdge[dim] > max[dim]) {
+                        return true;
+                    }
+                }
+                return false;
+            }
         } else if (this.slide_idx === 1) {
             // Spinning polygons
             for (const polygon of this.models.slide1) {
