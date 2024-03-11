@@ -16,26 +16,16 @@ class Renderer {
         this.start_time = null;
         this.prev_time = null;
 
-        const numSides = 20;
-        const radius = 20;
-        const ballVertices = [];
-
-        for (let i = 0; i < numSides; i++) {
-            const angle = (2 * Math.PI * i) / numSides;
-            const x = radius * Math.cos(angle);
-            const y = radius * Math.sin(angle);
-            ballVertices.push(CG.Vector3(x, y, 1));
-        }
-
         this.models = {
 
             slide0: [
                 {
-                    vertices: ballVertices,
+                    vertices: [], // generated below
                     transform: new Matrix(3, 3),
                     velocity: { x: 5.75, y: 5.5 },
-                    x: this.canvas.width / 2,
-                    y: this.canvas.height / 2
+                    numSides: 20,
+                    radius: 20,
+                    position: { x: this.canvas.width / 2, y: this.canvas.height / 2 }
                 }
             ],
 
@@ -50,8 +40,7 @@ class Renderer {
                     transform: new Matrix(3, 3),
                     angVelocity: 3,
                     theta: 0,
-                    x: 150,
-                    y: 150
+                    position: { x: 150, y: 150 }
                 },
                 {
                     vertices: [
@@ -63,8 +52,7 @@ class Renderer {
                     transform: new Matrix(3, 3),
                     angVelocity: 1,
                     theta: 0,
-                    x: 400,
-                    y: 350
+                    position: { x: 400, y: 350 }
                 },
                 {
                     vertices: [
@@ -76,8 +64,7 @@ class Renderer {
                     transform: new Matrix(3, 3),
                     angVelocity: -10,
                     theta: 0,
-                    x: 650,
-                    y: 500
+                    position: { x: 650, y: 500 }
                 }
             ],
 
@@ -93,8 +80,7 @@ class Renderer {
                     scaleVelocity: { x: 0.05, y: 0.05 },
                     scaleMagnitude: { x: 4, y: 4 },
                     scale: { x: 1, y: 1 },
-                    x: 200,
-                    y: 250
+                    position: { x: 200, y: 250 }
                 },
                 {
                     vertices: [
@@ -107,8 +93,7 @@ class Renderer {
                     scaleVelocity: { x: 0.05, y: -0.00625 },
                     scaleMagnitude: { x: 5, y: 0.5 },
                     scale: { x: 1, y: 1 },
-                    x: 550,
-                    y: 400
+                    position: { x: 550, y: 400 }
                 }
             ],
 
@@ -128,11 +113,19 @@ class Renderer {
                     scale: { x: 1, y: 1 },
                     radius: 100,
                     orbitSpeed: 0.001,
-                    x: 150,
-                    y: 150
+                    position: { x: 150, y: 150 }
                 }
             ]
         };
+
+        // Generate ball vertices
+        const ball = this.models.slide0[0];
+        for (let i = 0; i < ball.numSides; i++) {
+            const angle = (2 * Math.PI * i) / ball.numSides;
+            const x = ball.radius * Math.cos(angle);
+            const y = ball.radius * Math.sin(angle);
+            ball.vertices.push(CG.Vector3(x, y, 1));
+        }
     }
 
     // flag:  bool
@@ -194,20 +187,20 @@ class Renderer {
             const ball = this.models.slide0[0];
             const velocity = ball.velocity;
 
-            ball.x += velocity.x * delta_time;
-            ball.y += velocity.y * delta_time;
+            ball.position.x += velocity.x * delta_time;
+            ball.position.y += velocity.y * delta_time;
 
-            if (ball.x <= 0 || ball.x >= this.canvas.width) {
+            if (ball.position.x <= 0 || ball.position.x >= this.canvas.width) {
                 velocity.x = -velocity.x;
             }
-            if (ball.y <= 0 || ball.y >= this.canvas.height) {
+            if (ball.position.y <= 0 || ball.position.y >= this.canvas.height) {
                 velocity.y = -velocity.y;
             }
 
             ball.x = Math.max(0, Math.min(this.canvas.width, ball.x));
             ball.y = Math.max(0, Math.min(this.canvas.height, ball.y));
 
-            CG.mat3x3Translate(ball.transform, ball.x, ball.y);
+            CG.mat3x3Translate(ball.transform, ball.position.x, ball.position.y);
         } else if (this.slide_idx === 1) {
             // Spinning polygons
             for (const polygon of this.models.slide1) {
@@ -216,7 +209,7 @@ class Renderer {
                 const rotation = new Matrix(3, 3);
                 CG.mat3x3Rotate(rotation, polygon.theta);
                 const translation = new Matrix(3, 3);
-                CG.mat3x3Translate(translation, polygon.x, polygon.y);
+                CG.mat3x3Translate(translation, polygon.position.x, polygon.position.y);
                 polygon.transform = Matrix.multiply([translation, rotation]);
             }
         } else if (this.slide_idx === 2) {
@@ -247,7 +240,7 @@ class Renderer {
                 const scaling = new Matrix(3, 3);
                 CG.mat3x3Scale(scaling, polygon.scale.x, polygon.scale.y);
                 const translation = new Matrix(3, 3);
-                CG.mat3x3Translate(translation, polygon.x, polygon.y);
+                CG.mat3x3Translate(translation, polygon.position.x, polygon.position.y);
                 polygon.transform = Matrix.multiply([translation, scaling]);
             }
         } else if (this.slide_idx === 3) {
@@ -257,10 +250,10 @@ class Renderer {
             const rotation = new Matrix(3, 3);
             CG.mat3x3Rotate(rotation, polygon.theta);
 
-            polygon.x = this.canvas.width / 2 + polygon.radius * Math.cos(time * polygon.orbitSpeed);
-            polygon.y = this.canvas.height / 2 + polygon.radius * Math.sin(time * polygon.orbitSpeed);
+            polygon.position.x = this.canvas.width / 2 + polygon.radius * Math.cos(time * polygon.orbitSpeed);
+            polygon.position.y = this.canvas.height / 2 + polygon.radius * Math.sin(time * polygon.orbitSpeed);
             const translation = new Matrix(3, 3);
-            CG.mat3x3Translate(translation, polygon.x, polygon.y);
+            CG.mat3x3Translate(translation, polygon.position.x, polygon.position.y);
 
             for (const dim in polygon.scale) {
                 const delta_scale = polygon.scaleVelocity[dim] * delta_time;
